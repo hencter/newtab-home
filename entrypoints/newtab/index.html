@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Tab Home</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f8f5f0;
+      color: #1a1613;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 32px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #e8e2da;
+    }
+    h1 {
+      font-family: 'Newsreader', serif;
+      font-weight: 300;
+      font-size: 28px;
+      color: #1a1613;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .section-header h2 {
+      font-family: 'Newsreader', serif;
+      font-weight: 400;
+      font-size: 18px;
+      font-style: italic;
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #fffdf9;
+      border-radius: 12px;
+      border: 1px solid #e8e2da;
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .card:hover {
+      box-shadow: 0 4px 12px rgba(26,22,19,0.06);
+    }
+    .card-bar {
+      height: 4px;
+      background: #e8e2da;
+    }
+    .card.has-active .card-bar { background: #3d7a4a; }
+    .card-content { padding: 16px; }
+    .card-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title img { width: 16px; height: 16px; }
+    .tab-count {
+      font-size: 12px;
+      color: #9a918a;
+      font-weight: 400;
+      margin-bottom: 12px;
+    }
+    .tab-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tab-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: #f8f5f0;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+      max-width: 200px;
+    }
+    .tab-chip:hover { background: #e8e2da; }
+    .tab-chip img { width: 14px; height: 14px; flex-shrink: 0; }
+    .tab-chip span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tab-chip .close {
+      opacity: 0;
+      color: #9a918a;
+      font-size: 14px;
+      padding: 2px;
+      cursor: pointer;
+    }
+    .tab-chip:hover .close { opacity: 1; }
+    .tab-chip .close:hover { color: #b35a5a; }
+    .card-actions {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e8e2da;
+    }
+    .close-all-btn {
+      font-size: 12px;
+      padding: 6px 12px;
+      border: none;
+      background: #f8f5f0;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #9a918a;
+      transition: all 0.15s;
+    }
+    .close-all-btn:hover {
+      background: #b35a5a;
+      color: white;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #9a918a;
+    }
+    .empty-state h2 {
+      font-family: 'Newsreader', serif;
+      font-size: 24px;
+      font-weight: 400;
+      color: #1a1613;
+      margin-bottom: 8px;
+    }
+    .loading { text-align: center; padding: 60px; color: #9a918a; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>New Tab Home</h1>
+        <p style="font-size:13px;color:#9a918a;margin-top:4px" id="dateDisplay"></p>
+      </div>
+    </header>
+
+    <div id="content">
+      <div class="loading">加载中...</div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
