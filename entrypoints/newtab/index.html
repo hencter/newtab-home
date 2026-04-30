@@ -1,164 +1,231 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>New Tab Home</title>
+</head>
+<body>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #f8f5f0;
-      color: #1a1613;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(180deg, #fbf7f0 0%, #f5f1ea 100%);
+      color: #201b18;
       min-height: 100vh;
     }
-    .container {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 48px 32px;
+    .header {
+      padding: 32px 16px 24px;
+      border-bottom: 1px solid #d8cec3;
+      margin-bottom: 24px;
     }
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 32px;
-      padding-bottom: 24px;
-      border-bottom: 1px solid #e8e2da;
+    .header h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 32px;
+      font-weight: 700;
     }
-    h1 {
-      font-family: 'Newsreader', serif;
-      font-weight: 300;
-      font-size: 28px;
-      color: #1a1613;
-    }
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-    }
-    .section-header h2 {
-      font-family: 'Newsreader', serif;
-      font-weight: 400;
-      font-size: 18px;
-      font-style: italic;
-    }
-    .cards-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
+    .header-date {
+      font-size: 13px;
+      color: #6d645d;
+      margin-top: 4px;
     }
     .card {
-      background: #fffdf9;
-      border-radius: 12px;
-      border: 1px solid #e8e2da;
+      position: absolute;
+      background: #fffdf8;
+      border: 1px solid #d8cec3;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 12px 32px rgba(54,40,23,0.08);
       overflow: hidden;
-      transition: box-shadow 0.2s;
     }
-    .card:hover {
-      box-shadow: 0 4px 12px rgba(26,22,19,0.06);
-    }
-    .card-bar {
-      height: 4px;
-      background: #e8e2da;
-    }
-    .card.has-active .card-bar { background: #3d7a4a; }
-    .card-content { padding: 16px; }
     .card-title {
-      font-weight: 600;
-      font-size: 14px;
-      margin-bottom: 4px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 16px;
+      cursor: pointer;
     }
-    .card-title img { width: 16px; height: 16px; }
+    .card-title:hover {
+      color: #3d7a4a;
+    }
+    .card-title img {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+    }
     .tab-count {
-      font-size: 12px;
-      color: #9a918a;
-      font-weight: 400;
-      margin-bottom: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #9e968d;
+      background: #f0ebe3;
+      padding: 2px 8px;
+      border-radius: 10px;
     }
     .tab-list {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+      margin-bottom: 16px;
     }
     .tab-chip {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      background: #f8f5f0;
-      border-radius: 6px;
+      gap: 7px;
+      padding: 6px 11px;
+      background: #f0ebe3;
+      border-radius: 18px;
       font-size: 12px;
       cursor: pointer;
-      transition: background 0.15s;
-      max-width: 200px;
+      transition: all 0.15s ease;
     }
-    .tab-chip:hover { background: #e8e2da; }
-    .tab-chip img { width: 14px; height: 14px; flex-shrink: 0; }
+    .tab-chip:hover {
+      background: #e5dfd4;
+      transform: translateY(-1px);
+    }
+    .tab-chip.active {
+      background: #3d7a4a;
+      color: white;
+    }
+    .tab-chip.long {
+      border-radius: 8px;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .tab-chip img {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      border-radius: 3px;
+    }
     .tab-chip span {
+      flex: 1;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .tab-chip.long span {
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
     .tab-chip .close {
       opacity: 0;
-      color: #9a918a;
+      color: #9e968d;
       font-size: 14px;
-      padding: 2px;
       cursor: pointer;
+      padding: 2px;
     }
-    .tab-chip:hover .close { opacity: 1; }
-    .tab-chip .close:hover { color: #b35a5a; }
+    .tab-chip:hover .close {
+      opacity: 1;
+    }
+    .tab-chip .close:hover {
+      color: #c74b4b;
+    }
     .card-actions {
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid #e8e2da;
+      padding-top: 14px;
+      border-top: 1px solid #d8cec3;
+      display: flex;
+      justify-content: flex-end;
     }
     .close-all-btn {
       font-size: 12px;
-      padding: 6px 12px;
+      font-weight: 500;
+      padding: 8px 14px;
       border: none;
-      background: #f8f5f0;
-      border-radius: 6px;
+      background: transparent;
+      border-radius: 8px;
       cursor: pointer;
-      color: #9a918a;
-      transition: all 0.15s;
+      color: #9e968d;
+      transition: all 0.2s ease;
     }
     .close-all-btn:hover {
-      background: #b35a5a;
+      background: #c74b4b;
       color: white;
+    }
+    .folder-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #d8cec3;
+    }
+    .folder-icon {
+      font-size: 16px;
+    }
+    .folder-title {
+      font-weight: 600;
+      font-size: 13px;
+      color: #6d645d;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .folder-count {
+      font-size: 11px;
+      color: #9e968d;
+      margin-left: auto;
+    }
+    .bookmark-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .bookmark-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: #ffffff;
+      border: 1px solid #d8cec3;
+      border-radius: 12px;
+      font-size: 13px;
+      color: #201b18;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .bookmark-item:hover {
+      background: #fefefe;
+      transform: translateX(2px);
+    }
+    .bookmark-item img {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      border-radius: 3px;
+    }
+    .bookmark-item span {
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .empty-state {
       text-align: center;
-      padding: 60px 20px;
-      color: #9a918a;
+      padding: 80px 20px;
     }
     .empty-state h2 {
-      font-family: 'Newsreader', serif;
+      font-family: Georgia, "Times New Roman", serif;
       font-size: 24px;
       font-weight: 400;
-      color: #1a1613;
+      color: #201b18;
       margin-bottom: 8px;
+      font-style: italic;
     }
-    .loading { text-align: center; padding: 60px; color: #9a918a; }
+    .empty-state p {
+      color: #6d645d;
+      font-size: 14px;
+    }
   </style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <div>
-        <h1>New Tab Home</h1>
-        <p style="font-size:13px;color:#9a918a;margin-top:4px" id="dateDisplay"></p>
-      </div>
-    </header>
-
-    <div id="content">
-      <div class="loading">加载中...</div>
-    </div>
+  
+  <div class="header">
+    <h1>New Tab Home</h1>
+    <p class="header-date" id="dateDisplay"></p>
   </div>
+  
+  <div id="content-container"></div>
 
   <script type="module" src="./main.ts"></script>
 </body>

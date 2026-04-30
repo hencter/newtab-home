@@ -1,206 +1,291 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const FRIENDLY_NAMES: Record<string, string> = {
-    'github.com': 'GitHub',
-    'youtube.com': 'YouTube',
-    'x.com': 'X',
-    'twitter.com': 'X',
-    'reddit.com': 'Reddit',
-    'linkedin.com': 'LinkedIn',
-    'stackoverflow.com': 'Stack Overflow',
-    'google.com': 'Google',
-    'mail.google.com': 'Gmail',
-    'chatgpt.com': 'ChatGPT',
-    'chat.openai.com': 'ChatGPT',
-    'claude.ai': 'Claude',
-    'notion.so': 'Notion',
-    'figma.com': 'Figma',
-    'slack.com': 'Slack',
-    'discord.com': 'Discord',
-  };
+import { prepare, layout, type PreparedText } from '@chenglou/pretext';
 
-  function friendlyName(hostname: string): string {
-    if (!hostname) return '';
-    return FRIENDLY_NAMES[hostname] || hostname.replace(/^www\./, '');
-  }
+const font = '14px -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif';
+const config = {
+  gap: 16,
+  maxColWidth: 320,
+  minColWidth: 260
+};
 
-  function cleanTitle(title: string, url: string): string {
-    if (!title || !url) return title || '';
-    try {
-      const hostname = new URL(url).hostname;
-      const seps = [' - ', ' | ', ' — ', ' · '];
-      for (const sep of seps) {
-        const idx = title.lastIndexOf(sep);
-        if (idx !== -1) {
-          const suffix = title.slice(idx + sep.length).trim().toLowerCase();
-          if (suffix === hostname.replace(/^www\./, '') || suffix === friendlyName(hostname).toLowerCase()) {
-            return title.slice(0, idx).trim();
-          }
+type Card = {
+  type: 'tab-group' | 'bookmark';
+  domain?: string;
+  title: string;
+  tabs?: chrome.tabs.Tab[];
+  bookmarks?: { title: string; url: string }[];
+  prepared?: PreparedText;
+};
+
+const state = { cards: [] as Card[] };
+const domCache = {
+  container: document.getElementById('content-container')!,
+  cards: [] as (HTMLElement | undefined)[],
+};
+
+const FRIENDLY_NAMES: Record<string, string> = {
+  'github.com': 'GitHub', 'youtube.com': 'YouTube', 'x.com': 'X', 'twitter.com': 'X',
+  'reddit.com': 'Reddit', 'linkedin.com': 'LinkedIn', 'stackoverflow.com': 'Stack Overflow',
+  'google.com': 'Google', 'mail.google.com': 'Gmail', 'chatgpt.com': 'ChatGPT',
+  'claude.ai': 'Claude', 'notion.so': 'Notion', 'figma.com': 'Figma', 'slack.com': 'Slack',
+  'discord.com': 'Discord', 'bilibili.com': 'B站', 'zhihu.com': '知乎', 'juejin.cn': '掘金',
+};
+
+function friendlyName(hostname: string): string {
+  return FRIENDLY_NAMES[hostname] || hostname.replace(/^www\./, '');
+}
+
+function cleanTitle(title: string, url: string): string {
+  if (!title || !url) return title || '';
+  try {
+    const hostname = new URL(url).hostname;
+    const seps = [' - ', ' | ', ' — ', ' · '];
+    for (const sep of seps) {
+      const idx = title.lastIndexOf(sep);
+      if (idx !== -1) {
+        const suffix = title.slice(idx + sep.length).trim().toLowerCase();
+        if (suffix === hostname.replace(/^www\./, '') || suffix === friendlyName(hostname).toLowerCase()) {
+          return title.slice(0, idx).trim();
         }
       }
-    } catch {}
-    return title;
-  }
-
-  function stripNoise(title: string): string {
-    if (!title) return '';
-    return title.replace(/^\(\d+\+?\)\s*/, '').trim();
-  }
-
-  function isRealTab(url: string): boolean {
-    if (!url) return false;
-    return !url.startsWith('chrome://') && 
-           !url.startsWith('chrome-extension://') && 
-           !url.startsWith('about:');
-  }
-
-  function getFavicon(domain: string): string {
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-  }
-
-  async function fetchOpenTabs() {
-    const tabs = await chrome.tabs.query({});
-    return tabs.filter(t => isRealTab(t.url || ''));
-  }
-
-  async function focusTab(tabId: number) {
-    const tab = await chrome.tabs.get(tabId);
-    if (tab.windowId) {
-      await chrome.windows.update(tab.windowId, { focused: true });
     }
-    await chrome.tabs.update(tabId, { active: true });
-  }
+  } catch {}
+  return title;
+}
 
-  async function closeTab(tabId: number) {
-    await chrome.tabs.remove(tabId);
-  }
+function stripNoise(title: string): string {
+  return title.replace(/^\(\d+\+?\)\s*/, '').trim();
+}
 
-  async function render() {
-    const content = document.getElementById('content')!;
-    const dateEl = document.getElementById('dateDisplay')!;
+function getFavicon(domain: string): string {
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+}
+
+function isRealTab(url: string): boolean {
+  return !url.startsWith('chrome://') && !url.startsWith('chrome-extension://') && !url.startsWith('about:');
+}
+
+function createCardNode(card: Card, index: number): HTMLElement {
+  const node = document.createElement('div');
+  node.className = 'card';
+  node.dataset.index = String(index);
+  
+  if (card.type === 'tab-group' && card.tabs) {
+    const tabsHtml = card.tabs.map(t => {
+      const title = cleanTitle(stripNoise(t.title || ''), t.url || '');
+      const isLong = title.length > 25;
+      const isActive = t.active;
+      return `<div class="tab-chip ${isLong ? 'long' : ''} ${isActive ? 'active' : ''}" data-id="${t.id}"><img src="${t.favIconUrl || getFavicon(card.domain!)}"><span>${title}</span><span class="close" data-id="${t.id}">✕</span></div>`;
+    }).join('');
     
-    const now = new Date();
-    dateEl.textContent = now.toLocaleDateString('zh-CN', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
-
-    const tabs = await fetchOpenTabs();
-    
-    if (tabs.length === 0) {
-      content.innerHTML = `
-        <div class="empty-state">
-          <h2>Inbox zero, but for tabs.</h2>
-          <p>你很自由。</p>
+    node.innerHTML = `
+      <div class="card-content">
+        <div class="card-title" data-domain="${card.domain}">
+          <img src="${getFavicon(card.domain!)}"> ${card.title} 
+          <span class="tab-count">${card.tabs.length}</span>
         </div>
-      `;
+        <div class="tab-list">${tabsHtml}</div>
+        <div class="card-actions">
+          <button class="close-all-btn">关闭全部</button>
+        </div>
+      </div>`;
+  } else if (card.type === 'bookmark' && card.bookmarks) {
+    const bmsHtml = card.bookmarks.map(b => {
+      try {
+        const domain = new URL(b.url).hostname;
+        return `<a class="bookmark-item" href="${b.url}" target="_blank"><img src="${getFavicon(domain)}"><span>${b.title}</span></a>`;
+      } catch { return ''; }
+    }).join('');
+    
+    node.innerHTML = `
+      <div class="card-content">
+        <div class="folder-header">
+          <span class="folder-icon">📂</span>
+          <span class="folder-title">${card.title}</span>
+          <span class="folder-count">${card.bookmarks.length}</span>
+        </div>
+        <div class="bookmark-list">${bmsHtml}</div>
+      </div>`;
+  }
+  
+  return node;
+}
+
+function renderMasonry() {
+  const windowWidth = document.documentElement.clientWidth;
+  const paddingX = windowWidth < 600 ? 16 : 40;
+  const availableWidth = windowWidth - paddingX * 2;
+  
+  let colCount = Math.max(1, Math.floor((availableWidth + config.gap) / (config.minColWidth + config.gap)));
+  colCount = Math.min(colCount, 8);
+  
+  let colWidth = Math.floor((availableWidth - (colCount - 1) * config.gap) / colCount);
+  colWidth = Math.min(colWidth, config.maxColWidth);
+
+  const contentWidth = colCount * colWidth + (colCount - 1) * config.gap;
+  const offsetLeft = Math.floor((windowWidth - contentWidth) / 2);
+
+  const colHeights = new Array(colCount).fill(0);
+
+  // 插入节点获取真实高度
+  state.cards.forEach((card, i) => {
+    let node = domCache.cards[i];
+    if (!node) {
+      node = createCardNode(card, i);
+      domCache.container.appendChild(node);
+      domCache.cards[i] = node;
+    }
+    node.style.width = `${colWidth}px`;
+  });
+
+  // 计算坐标
+  state.cards.forEach((card, i) => {
+    const node = domCache.cards[i]!;
+    const cardHeight = node.offsetHeight;
+    
+    // 使用 pretext 获取标题信息（可选）
+    if (card.prepared) {
+      layout(card.prepared, colWidth - 32, 22);
+    }
+
+    let shortestCol = 0;
+    for (let c = 1; c < colCount; c++) {
+      if (colHeights[c] < colHeights[shortestCol]) shortestCol = c;
+    }
+
+    const x = offsetLeft + shortestCol * (colWidth + config.gap);
+    const y = colHeights[shortestCol];
+
+    node.style.transform = `translate(${x}px, ${y}px)`;
+
+    colHeights[shortestCol] += cardHeight + config.gap;
+  });
+
+  const maxContentHeight = Math.max(...colHeights);
+  domCache.container.style.height = `${maxContentHeight}px`;
+}
+
+let resizeTimer: number;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => requestAnimationFrame(renderMasonry), 100);
+});
+
+async function loadData() {
+  const tabs = (await chrome.tabs.query({})).filter(t => isRealTab(t.url || ''));
+  const groups: Record<string, { domain: string; tabs: chrome.tabs.Tab[] }> = {};
+  for (const tab of tabs) {
+    try {
+      const hostname = new URL(tab.url!).hostname;
+      if (!groups[hostname]) groups[hostname] = { domain: hostname, tabs: [] };
+      groups[hostname].tabs.push(tab);
+    } catch {}
+  }
+
+  const sortedGroups = Object.values(groups).sort((a, b) => b.tabs.length - a.tabs.length);
+  
+  state.cards = sortedGroups.map(g => ({
+    type: 'tab-group' as const,
+    domain: g.domain,
+    title: friendlyName(g.domain),
+    tabs: g.tabs,
+    prepared: prepare(`${friendlyName(g.domain)} ${g.tabs.length} tabs`, font),
+  }));
+
+  // 书签
+  try {
+    const tree = await chrome.bookmarks.getTree();
+    const folders: { title: string; bookmarks: { title: string; url: string }[] }[] = [];
+    function extract(node: chrome.bookmarks.BookmarkTreeNode) {
+      if (node.children) {
+        const bookmarks: { title: string; url: string }[] = [];
+        function collect(children: chrome.bookmarks.BookmarkTreeNode[]) {
+          for (const child of children) {
+            if (child.url) bookmarks.push({ title: child.title, url: child.url });
+            if (child.children) collect(child.children);
+          }
+        }
+        collect(node.children);
+        if (bookmarks.length > 0) {
+          folders.push({ title: node.title || '书签', bookmarks: bookmarks.slice(0, 15) });
+        }
+        if (folders.length >= 6) return;
+        for (const child of node.children) {
+          if (folders.length >= 6) break;
+          extract(child);
+        }
+      }
+    }
+    for (const node of tree) {
+      if (folders.length >= 6) break;
+      extract(node);
+    }
+    for (const folder of folders) {
+      state.cards.push({
+        type: 'bookmark',
+        title: folder.title,
+        bookmarks: folder.bookmarks,
+        prepared: prepare(`${folder.title} ${folder.bookmarks.length}`, font),
+      });
+    }
+  } catch {}
+
+  requestAnimationFrame(renderMasonry);
+}
+
+async function createTab(domain: string, mode: 'tab' | 'window' | 'split' = 'tab') {
+  const url = domain.includes('.') ? `https://${domain}` : `https://${domain}.com`;
+  const currentWin = await chrome.windows.getCurrent();
+  const w = Math.floor((currentWin.width || 1200) / 2);
+  if (mode === 'split') {
+    await chrome.windows.create({ url, focused: true, left: (currentWin.left || 0) + w, width: w, top: currentWin.top || 0, height: currentWin.height || 800 });
+  } else if (mode === 'window') {
+    await chrome.windows.create({ url, focused: true });
+  } else {
+    await chrome.tabs.create({ url });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const dateEl = document.getElementById('dateDisplay')!;
+  dateEl.textContent = new Date().toLocaleDateString('zh-CN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  document.body.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+    const cardTitle = target.closest('.card-title');
+    const closeBtn = target.closest('.tab-chip .close');
+    const chip = target.closest('.tab-chip');
+    const closeAllBtn = target.closest('.close-all-btn');
+
+    if (cardTitle) {
+      e.preventDefault();
+      const domain = (cardTitle as HTMLElement).dataset.domain || '';
+      const mode = e.ctrlKey ? 'split' : e.shiftKey ? 'window' : 'tab';
+      await createTab(domain, mode);
       return;
     }
-
-    const groups: Record<string, { domain: string; tabs: typeof tabs }> = {};
-    for (const tab of tabs) {
-      try {
-        const hostname = new URL(tab.url!).hostname;
-        if (!groups[hostname]) {
-          groups[hostname] = { domain: hostname, tabs: [] };
-        }
-        groups[hostname].tabs.push(tab);
-      } catch {}
-    }
-
-    const sortedGroups = Object.values(groups).sort((a, b) => b.tabs.length - a.tabs.length);
-
-    content.innerHTML = `
-      <div class="section-header">
-        <h2>打开的标签页</h2>
-        <span style="color:#9a918a;font-size:14px">${sortedGroups.length} 个域名 · ${tabs.length} 个标签</span>
-      </div>
-      <div class="cards-grid">
-        ${sortedGroups.map(g => renderCard(g)).join('')}
-      </div>
-    `;
-  }
-
-  function renderCard(group: { domain: string; tabs: typeof chrome.tabs.Tab[] }) {
-    const domain = group.domain;
-    const tabs = group.tabs;
-    const name = friendlyName(domain);
-    const hasActive = tabs.some(t => t.active);
-
-    return `
-      <div class="card ${hasActive ? 'has-active' : ''}">
-        <div class="card-bar"></div>
-        <div class="card-content">
-          <div class="card-title">
-            <img src="${getFavicon(domain)}" onerror="this.style.display='none'">
-            ${name}
-            <span class="tab-count">${tabs.length} tabs</span>
-          </div>
-          <div class="tab-list">
-            ${tabs.map(t => renderTabChip(t as any, domain)).join('')}
-          </div>
-          <div class="card-actions">
-            <button class="close-all-btn" data-domain="${domain}">
-              关闭全部 ${tabs.length} 个
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderTabChip(tab: { id: number; title?: string; url?: string; favIconUrl?: string; active: boolean }, domain: string) {
-    const title = cleanTitle(stripNoise(tab.title || ''), tab.url || '');
-    const safeTitle = title.replace(/"/g, '&quot;');
-    return `
-      <div class="tab-chip" data-id="${tab.id}" title="${safeTitle}">
-        <img src="${tab.favIconUrl || getFavicon(domain)}" onerror="this.style.display='none'">
-        <span>${title}</span>
-        <span class="close" data-id="${tab.id}">×</span>
-      </div>
-    `;
-  }
-
-  async function closeDomainTabs(domain: string) {
-    const tabs = await chrome.tabs.query({});
-    const toClose = tabs.filter(t => {
-      try { return new URL(t.url!).hostname === domain; } catch { return false; }
-    }).map(t => t.id);
-    
-    if (toClose.length > 0) {
-      await chrome.tabs.remove(toClose);
-      await render();
-    }
-  }
-
-  // Event delegation
-  document.addEventListener('click', async (e) => {
-    const target = e.target as HTMLElement;
-    const chip = target.closest('.tab-chip');
-    const closeBtn = target.closest('.tab-chip .close');
-    const closeAllBtn = target.closest('.close-all-btn');
-    
     if (closeBtn) {
       e.stopPropagation();
       const tabId = parseInt((closeBtn as HTMLElement).dataset.id || '0');
-      await closeTab(tabId);
-      await render();
+      await chrome.tabs.remove(tabId);
+      location.reload();
       return;
     }
-    
     if (chip && !closeBtn) {
+      e.preventDefault();
       const tabId = parseInt((chip as HTMLElement).dataset.id || '0');
-      await focusTab(tabId);
+      const tab = await chrome.tabs.get(tabId);
+      if (tab.windowId) await chrome.windows.update(tab.windowId, { focused: true });
+      await chrome.tabs.update(tabId, { active: true });
       return;
     }
-    
     if (closeAllBtn) {
+      e.preventDefault();
       const domain = (closeAllBtn as HTMLElement).dataset.domain || '';
-      await closeDomainTabs(domain);
-      return;
+      const tabs = await chrome.tabs.query({});
+      const toClose = tabs.filter(t => { try { return new URL(t.url!).hostname === domain; } catch { return false; } }).map(t => t.id);
+      if (toClose.length > 0) { await chrome.tabs.remove(toClose); location.reload(); }
     }
   });
 
-  render();
+  loadData();
 });
