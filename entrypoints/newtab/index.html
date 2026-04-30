@@ -66,57 +66,56 @@
     .tab-list {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 16px;
+      align-content: flex-start;
+      gap: 4px;
+      margin-bottom: 12px;
+      min-height: 20px;
     }
     .tab-chip {
       display: flex;
-      align-items: center;
-      gap: 7px;
-      padding: 6px 11px;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 4px 8px;
+      padding-right: 24px;
       background: #f0ebe3;
-      border-radius: 18px;
+      border-radius: 4px;
       font-size: 12px;
+      line-height: 1.4;
       cursor: pointer;
       transition: all 0.15s ease;
+      max-width: 100%;
+      box-sizing: border-box;
+      position: relative;
     }
     .tab-chip:hover {
       background: #e5dfd4;
-      transform: translateY(-1px);
     }
     .tab-chip.active {
       background: #3d7a4a;
       color: white;
     }
-    .tab-chip.long {
-      border-radius: 8px;
-      flex-direction: column;
-      align-items: flex-start;
-    }
     .tab-chip img {
-      width: 14px;
-      height: 14px;
+      width: 12px;
+      height: 12px;
       flex-shrink: 0;
-      border-radius: 3px;
+      border-radius: 2px;
+      margin-top: 2px;
     }
     .tab-chip span {
       flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .tab-chip.long span {
+      min-width: 0;
+      word-break: break-word;
       white-space: normal;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
     }
     .tab-chip .close {
       opacity: 0;
       color: #9e968d;
       font-size: 14px;
       cursor: pointer;
-      padding: 2px;
+      position: absolute;
+      right: 4px;
+      top: 4px;
     }
     .tab-chip:hover .close {
       opacity: 1;
@@ -170,8 +169,8 @@
     }
     .bookmark-list {
       display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
+      flex-direction: column;
+      gap: 6px;
     }
     .bookmark-item {
       display: flex;
@@ -197,10 +196,8 @@
       border-radius: 3px;
     }
     .bookmark-item span {
-      max-width: 160px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      white-space: normal;
+      word-break: break-word;
     }
     .empty-state {
       text-align: center;

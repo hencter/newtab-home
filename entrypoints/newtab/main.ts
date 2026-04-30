@@ -72,9 +72,8 @@ function createCardNode(card: Card, index: number): HTMLElement {
   if (card.type === 'tab-group' && card.tabs) {
     const tabsHtml = card.tabs.map(t => {
       const title = cleanTitle(stripNoise(t.title || ''), t.url || '');
-      const isLong = title.length > 25;
       const isActive = t.active;
-      return `<div class="tab-chip ${isLong ? 'long' : ''} ${isActive ? 'active' : ''}" data-id="${t.id}"><img src="${t.favIconUrl || getFavicon(card.domain!)}"><span>${title}</span><span class="close" data-id="${t.id}">✕</span></div>`;
+      return `<div class="tab-chip ${isActive ? 'active' : ''}" data-id="${t.id}"><img src="${t.favIconUrl || getFavicon(card.domain!)}"><span>${title}</span><span class="close" data-id="${t.id}">✕</span></div>`;
     }).join('');
     
     node.innerHTML = `
@@ -126,7 +125,7 @@ function renderMasonry() {
 
   const colHeights = new Array(colCount).fill(0);
 
-  // 插入节点获取真实高度
+  // 1. 插入 DOM 获取高度
   state.cards.forEach((card, i) => {
     let node = domCache.cards[i];
     if (!node) {
@@ -137,15 +136,10 @@ function renderMasonry() {
     node.style.width = `${colWidth}px`;
   });
 
-  // 计算坐标
+  // 2. 计算坐标
   state.cards.forEach((card, i) => {
     const node = domCache.cards[i]!;
     const cardHeight = node.offsetHeight;
-    
-    // 使用 pretext 获取标题信息（可选）
-    if (card.prepared) {
-      layout(card.prepared, colWidth - 32, 22);
-    }
 
     let shortestCol = 0;
     for (let c = 1; c < colCount; c++) {
@@ -156,7 +150,6 @@ function renderMasonry() {
     const y = colHeights[shortestCol];
 
     node.style.transform = `translate(${x}px, ${y}px)`;
-
     colHeights[shortestCol] += cardHeight + config.gap;
   });
 
