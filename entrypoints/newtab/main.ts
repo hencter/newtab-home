@@ -80,9 +80,7 @@ function createCardNode(card: Card, index: number): HTMLElement {
           <span class="tab-count">${card.tabs.length}</span>
         </div>
         <div class="tab-list">${tabsHtml}</div>
-        <div class="card-actions">
-          <button class="close-all-btn">关闭全部</button>
-        </div>
+
       </div>`;
   } else if (card.type === 'bookmark' && card.bookmarks) {
     const bmsHtml = card.bookmarks.map(b => {
@@ -257,8 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const cardTitle = target.closest('.card-title');
     const closeBtn = target.closest('.tab-chip .close');
     const chip = target.closest('.tab-chip');
-    const closeAllBtn = target.closest('.close-all-btn');
-
     if (cardTitle) {
       e.preventDefault();
       const domain = (cardTitle as HTMLElement).dataset.domain || '';
@@ -280,13 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tab.windowId) await chrome.windows.update(tab.windowId, { focused: true });
       await chrome.tabs.update(tabId, { active: true });
       return;
-    }
-    if (closeAllBtn) {
-      e.preventDefault();
-      const domain = (closeAllBtn as HTMLElement).dataset.domain || '';
-      const tabs = await chrome.tabs.query({});
-      const toClose = tabs.filter(t => { try { return new URL(t.url!).hostname === domain; } catch { return false; } }).map(t => t.id);
-      if (toClose.length > 0) { await chrome.tabs.remove(toClose); location.reload(); }
     }
   });
 
