@@ -178,50 +178,45 @@ async function loadData() {
     tabs: g.tabs,
   }));
 
-  // 书签：只显示二级文件夹的内容
+  // 书签：递归遍历，每个有直接书签的文件夹独立展示
   try {
     const tree = await chrome.bookmarks.getTree();
     const folders: { title: string; bookmarks: { title: string; url: string }[] }[] = [];
     
-    for (const root of tree) {
-      if (!root.children) continue;
+    function walk(node: chrome.bookmarks.BookmarkTreeNode) {
+      if (!node.children) return;
       
-      for (const child of root.children) {
-        if (folders.length >= 6) break;
-        
-        // 只处理有子文件夹的节点（第二级文件夹）
-        if (child.children) {
-          const hasSubFolder = child.children.some(c => c.children);
-          
-          if (hasSubFolder) {
-            // 有三级，展示三级文件夹内容
-            for (const subChild of child.children) {
-              if (subChild.children && subChild.children.length > 0) {
-                const bookmarks: { title: string; url: string }[] = [];
-                for (const leaf of subChild.children) {
-                  if (leaf.url) bookmarks.push({ title: leaf.title, url: leaf.url });
-                }
-                if (bookmarks.length > 0) {
-                  folders.push({ title: subChild.title, bookmarks: bookmarks.slice(0, 15) });
-                }
-              }
-              if (folders.length >= 6) break;
-            }
-          } else {
-            // 没有三级，展示二级文件夹的直接书签
-            const bookmarks: { title: string; url: string }[] = [];
-            for (const leaf of child.children) {
-              if (leaf.url) bookmarks.push({ title: leaf.title, url: leaf.url });
-            }
-            if (bookmarks.length > 0) {
-              folders.push({ title: child.title, bookmarks: bookmarks.slice(0, 15) });
-            }
-          }
+      // 收集该文件夹的直接书签（非递归，只取直接子节点中的书签）
+      const directBookmarks: { title: string; url: string }[] = [];
+      for (const child of node.children) {
+        if (child.url) {
+          directBookmarks.push({ title: child.title, url: child.url });
+        }
+      }
+      
+      // 跳过根节点和空文件夹
+      if (directBookmarks.length > 0 && node.title && node.title !== '') {
+        folders.push({ title: node.title, bookmarks: directBookmarks.slice(0, 15) });
+      }
+      
+      // 递归子文件夹
+      for (const child of node.children) {
+        if (child.children && child.children.length > 0) walk(child);
+      }
+    }
+    
+    for (const root of tree) {
+      if (root.children) {
+        for (const folder of root.children) {
+          walk(folder);
         }
       }
     }
     
-    for (const folder of folders) {
+    // 按书签数量降序排列
+    folders.sort((a, b) => b.bookmarks.length - a.bookmarks.length);
+    
+    for (const folder of folders.slice(0, 8)) {
       state.cards.push({
         type: 'bookmark',
         title: folder.title,
