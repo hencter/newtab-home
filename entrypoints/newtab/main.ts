@@ -1,11 +1,8 @@
 
-import { prepare, layout } from '@chenglou/pretext';
-
 const config = {
   gap: 16,
   maxColWidth: 320,
-  minColWidth: 260,
-  lineHeight: 18
+  minColWidth: 260
 };
 
 type Card = {
@@ -14,8 +11,6 @@ type Card = {
   title: string;
   tabs?: chrome.tabs.Tab[];
   bookmarks?: { title: string; url: string }[];
-  _titlePrepared?: ReturnType<typeof prepare>;
-  _itemsPrepared?: ReturnType<typeof prepare>[];
 };
 
 const state = { cards: [] as Card[] };
@@ -127,7 +122,7 @@ function renderMasonry() {
 
   const colHeights = new Array(colCount).fill(0);
 
-  // 用 pretext 计算高度，不需要插入 DOM
+  // 1. 插入节点
   state.cards.forEach((card, i) => {
     let node = domCache.cards[i];
     if (!node) {
@@ -136,34 +131,12 @@ function renderMasonry() {
       domCache.cards[i] = node;
     }
     node.style.width = `${colWidth}px`;
+  });
 
-    let cardHeight = 0;
-    const innerWidth = colWidth - 32;
-
-    if (card.type === 'tab-group' && card.tabs) {
-      const titlePrep = prepare(card.title, '14px -apple-system, sans-serif');
-      cardHeight += layout(titlePrep, innerWidth, 20).height + 20;
-      
-      card.tabs.forEach(t => {
-        const title = cleanTitle(stripNoise(t.title || ''), t.url || '');
-        const tabPrep = prepare(title, '12px -apple-system, sans-serif');
-        const tabHeight = layout(tabPrep, innerWidth - 8, 16).height;
-        cardHeight += Math.max(tabHeight + 8, 20);
-      });
-      
-      cardHeight += 52;
-    } else if (card.type === 'bookmark' && card.bookmarks) {
-      const folderPrep = prepare(card.title, '13px -apple-system, sans-serif');
-      cardHeight += layout(folderPrep, innerWidth, 18).height + 30;
-      
-      card.bookmarks.forEach(b => {
-        const bmPrep = prepare(b.title, '13px -apple-system, sans-serif');
-        const bmHeight = layout(bmPrep, innerWidth - 8, 16).height;
-        cardHeight += Math.max(bmHeight + 8, 24);
-      });
-    }
-
-    cardHeight += 32;
+  // 2. 用 DOM 高度定位
+  state.cards.forEach((card, i) => {
+    const node = domCache.cards[i]!;
+    const cardHeight = node.offsetHeight;
 
     let shortestCol = 0;
     for (let c = 1; c < colCount; c++) {
@@ -174,8 +147,6 @@ function renderMasonry() {
     const y = colHeights[shortestCol];
 
     node.style.transform = `translate(${x}px, ${y}px)`;
-    node.style.height = `${cardHeight}px`;
-
     colHeights[shortestCol] += cardHeight + config.gap;
   });
 
@@ -209,34 +180,49 @@ async function loadData() {
     tabs: g.tabs,
   }));
 
-  // 书签
+  // 书签：只显示二级文件夹的内容
   try {
     const tree = await chrome.bookmarks.getTree();
     const folders: { title: string; bookmarks: { title: string; url: string }[] }[] = [];
-    function extract(node: chrome.bookmarks.BookmarkTreeNode) {
-      if (node.children) {
-        const bookmarks: { title: string; url: string }[] = [];
-        function collect(children: chrome.bookmarks.BookmarkTreeNode[]) {
-          for (const child of children) {
-            if (child.url) bookmarks.push({ title: child.title, url: child.url });
-            if (child.children) collect(child.children);
+    
+    for (const root of tree) {
+      if (!root.children) continue;
+      
+      for (const child of root.children) {
+        if (folders.length >= 6) break;
+        
+        // 只处理有子文件夹的节点（第二级文件夹）
+        if (child.children) {
+          const hasSubFolder = child.children.some(c => c.children);
+          
+          if (hasSubFolder) {
+            // 有三级，展示三级文件夹内容
+            for (const subChild of child.children) {
+              if (subChild.children && subChild.children.length > 0) {
+                const bookmarks: { title: string; url: string }[] = [];
+                for (const leaf of subChild.children) {
+                  if (leaf.url) bookmarks.push({ title: leaf.title, url: leaf.url });
+                }
+                if (bookmarks.length > 0) {
+                  folders.push({ title: subChild.title, bookmarks: bookmarks.slice(0, 15) });
+                }
+              }
+              if (folders.length >= 6) break;
+            }
+          } else {
+            // 没有三级，展示二级文件夹的直接书签
+            const bookmarks: { title: string; url: string }[] = [];
+            for (const leaf of child.children) {
+              if (leaf.url) bookmarks.push({ title: leaf.title, url: leaf.url });
+            }
+            if (bookmarks.length > 0) {
+              folders.push({ title: child.title, bookmarks: bookmarks.slice(0, 15) });
+            }
           }
-        }
-        collect(node.children);
-        if (bookmarks.length > 0) {
-          folders.push({ title: node.title || '书签', bookmarks: bookmarks.slice(0, 15) });
-        }
-        if (folders.length >= 6) return;
-        for (const child of node.children) {
-          if (folders.length >= 6) break;
-          extract(child);
         }
       }
     }
-    for (const node of tree) {
-      if (folders.length >= 6) break;
-      extract(node);
-    }
+    
     for (const folder of folders) {
       state.cards.push({
         type: 'bookmark',
