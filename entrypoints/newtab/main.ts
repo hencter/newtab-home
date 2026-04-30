@@ -1,10 +1,11 @@
-import { prepare, layout, type PreparedText } from '@chenglou/pretext';
 
-const font = '14px -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif';
+import { prepare, layout } from '@chenglou/pretext';
+
 const config = {
   gap: 16,
   maxColWidth: 320,
-  minColWidth: 260
+  minColWidth: 260,
+  lineHeight: 18
 };
 
 type Card = {
@@ -13,7 +14,8 @@ type Card = {
   title: string;
   tabs?: chrome.tabs.Tab[];
   bookmarks?: { title: string; url: string }[];
-  prepared?: PreparedText;
+  _titlePrepared?: ReturnType<typeof prepare>;
+  _itemsPrepared?: ReturnType<typeof prepare>[];
 };
 
 const state = { cards: [] as Card[] };
@@ -125,7 +127,7 @@ function renderMasonry() {
 
   const colHeights = new Array(colCount).fill(0);
 
-  // 1. 插入 DOM 获取高度
+  // 用 pretext 计算高度，不需要插入 DOM
   state.cards.forEach((card, i) => {
     let node = domCache.cards[i];
     if (!node) {
@@ -134,12 +136,34 @@ function renderMasonry() {
       domCache.cards[i] = node;
     }
     node.style.width = `${colWidth}px`;
-  });
 
-  // 2. 计算坐标
-  state.cards.forEach((card, i) => {
-    const node = domCache.cards[i]!;
-    const cardHeight = node.offsetHeight;
+    let cardHeight = 0;
+    const innerWidth = colWidth - 32;
+
+    if (card.type === 'tab-group' && card.tabs) {
+      const titlePrep = prepare(card.title, '14px -apple-system, sans-serif');
+      cardHeight += layout(titlePrep, innerWidth, 20).height + 20;
+      
+      card.tabs.forEach(t => {
+        const title = cleanTitle(stripNoise(t.title || ''), t.url || '');
+        const tabPrep = prepare(title, '12px -apple-system, sans-serif');
+        const tabHeight = layout(tabPrep, innerWidth - 8, 16).height;
+        cardHeight += Math.max(tabHeight + 8, 20);
+      });
+      
+      cardHeight += 52;
+    } else if (card.type === 'bookmark' && card.bookmarks) {
+      const folderPrep = prepare(card.title, '13px -apple-system, sans-serif');
+      cardHeight += layout(folderPrep, innerWidth, 18).height + 30;
+      
+      card.bookmarks.forEach(b => {
+        const bmPrep = prepare(b.title, '13px -apple-system, sans-serif');
+        const bmHeight = layout(bmPrep, innerWidth - 8, 16).height;
+        cardHeight += Math.max(bmHeight + 8, 24);
+      });
+    }
+
+    cardHeight += 32;
 
     let shortestCol = 0;
     for (let c = 1; c < colCount; c++) {
@@ -150,6 +174,8 @@ function renderMasonry() {
     const y = colHeights[shortestCol];
 
     node.style.transform = `translate(${x}px, ${y}px)`;
+    node.style.height = `${cardHeight}px`;
+
     colHeights[shortestCol] += cardHeight + config.gap;
   });
 
@@ -181,7 +207,6 @@ async function loadData() {
     domain: g.domain,
     title: friendlyName(g.domain),
     tabs: g.tabs,
-    prepared: prepare(`${friendlyName(g.domain)} ${g.tabs.length} tabs`, font),
   }));
 
   // 书签
@@ -217,7 +242,6 @@ async function loadData() {
         type: 'bookmark',
         title: folder.title,
         bookmarks: folder.bookmarks,
-        prepared: prepare(`${folder.title} ${folder.bookmarks.length}`, font),
       });
     }
   } catch {}
